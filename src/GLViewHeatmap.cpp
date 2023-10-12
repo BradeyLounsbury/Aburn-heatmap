@@ -166,7 +166,8 @@ void Aftr::GLViewHeatmap::loadMap()
    std::string wheeledCar( ManagerEnvironmentConfiguration::getSMM() + "/models/rcx_treads.wrl" );
    std::string grass( ManagerEnvironmentConfiguration::getSMM() + "/models/grassFloor400x400_pp.wrl" );
    std::string human( ManagerEnvironmentConfiguration::getSMM() + "/models/human_chest.wrl" );
-   
+   std::string grid(ManagerEnvironmentConfiguration::getLMM() + "/models/grid.fbx");
+
    OpenSimplexNoise noise;
 
    /*for (int i = 0; i < 50; i++) {
@@ -230,32 +231,51 @@ void Aftr::GLViewHeatmap::loadMap()
       worldLst->push_back( wo );
    }
 
-   { 
-      ////Create the infinite grass plane (the floor)
-      WO* wo = WO::New( grass, Vector( 1, 1, 1 ), MESH_SHADING_TYPE::mstFLAT );
-      wo->setPosition( Vector( 0, 0, 0 ) );
-      wo->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
-      wo->upon_async_model_loaded( [wo]()
-         {
-            ModelMeshSkin& grassSkin = wo->getModel()->getModelDataShared()->getModelMeshes().at( 0 )->getSkins().at( 0 );
-            grassSkin.getMultiTextureSet().at( 0 ).setTexRepeats( 5.0f );
-            grassSkin.setAmbient( aftrColor4f( 0.4f, 0.4f, 0.4f, 1.0f ) ); //Color of object when it is not in any light
-            grassSkin.setDiffuse( aftrColor4f( 1.0f, 1.0f, 1.0f, 1.0f ) ); //Diffuse color components (ie, matte shading color of this object)
-            grassSkin.setSpecular( aftrColor4f( 0.4f, 0.4f, 0.4f, 1.0f ) ); //Specular color component (ie, how "shiney" it is)
-            grassSkin.setSpecularCoefficient( 10 ); // How "sharp" are the specular highlights (bigger is sharper, 1000 is very sharp, 10 is very dull)
-            
-            OpenSimplexNoise noise;
-            auto &vertices = wo->getModel()->getCompositeVertexList();
-            for (int i = 0; i < vertices.size(); i++) {
-                auto z = (noise.Evaluate(vertices[i][0] * 256, vertices[i][1] * 256) * 100) + 5;
-                vertices[i][2] = z;
-                //std::cout << vertices[i].toString() << std::endl;
-            }
-         } );
-      
-      wo->setLabel( "Grass" );
-      worldLst->push_back( wo );
+   {
+       WO* wo = WO::New(grid, Vector(0.5, 0.5, 0.5), MESH_SHADING_TYPE::mstFLAT);
+
+       wo->setPosition(Vector(50, 50, 0));
+       wo->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
+       wo->upon_async_model_loaded([wo]()
+           {
+               ModelMeshSkin& grassSkin = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getSkins().at(0);
+               grassSkin.getMultiTextureSet().at(0).setTexRepeats(5.0f);
+               grassSkin.setAmbient(aftrColor4f(0.4f, 0.4f, 0.4f, 1.0f)); //Color of object when it is not in any light
+               grassSkin.setDiffuse(aftrColor4f(1.0f, 1.0f, 1.0f, 1.0f)); //Diffuse color components (ie, matte shading color of this object)
+               grassSkin.setSpecular(aftrColor4f(0.4f, 0.4f, 0.4f, 1.0f)); //Specular color component (ie, how "shiney" it is)
+               grassSkin.setSpecularCoefficient(10); // How "sharp" are the specular highlights (bigger is sharper, 1000 is very sharp, 10 is very dull)
+           });
+
+       wo->setLabel("Grid");
+       worldLst->push_back(wo);
    }
+
+   //{ 
+   //   ////Create the infinite grass plane (the floor)
+   //   WO* wo = WO::New( grass, Vector( 1, 1, 1 ), MESH_SHADING_TYPE::mstFLAT );
+
+   //   /*OpenSimplexNoise noise;
+   //   auto& vertices = wo->getModel()->getCompositeVertexList();
+   //   auto z_vec = vertices;
+   //   for (int i = 0; i < vertices.size(); i++) {
+   //       auto z = (noise.Evaluate(vertices[i][0] * 256, vertices[i][1] * 256) * 100) + 5;
+   //       z_vec[i][2] = z;
+   //   }*/
+   //   wo->setPosition( Vector( 0, 0, 0 ) );
+   //   wo->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
+   //   wo->upon_async_model_loaded( [wo]()
+   //      {
+   //         ModelMeshSkin& grassSkin = wo->getModel()->getModelDataShared()->getModelMeshes().at( 0 )->getSkins().at( 0 );
+   //         grassSkin.getMultiTextureSet().at( 0 ).setTexRepeats( 5.0f );
+   //         grassSkin.setAmbient( aftrColor4f( 0.4f, 0.4f, 0.4f, 1.0f ) ); //Color of object when it is not in any light
+   //         grassSkin.setDiffuse( aftrColor4f( 1.0f, 1.0f, 1.0f, 1.0f ) ); //Diffuse color components (ie, matte shading color of this object)
+   //         grassSkin.setSpecular( aftrColor4f( 0.4f, 0.4f, 0.4f, 1.0f ) ); //Specular color component (ie, how "shiney" it is)
+   //         grassSkin.setSpecularCoefficient( 10 ); // How "sharp" are the specular highlights (bigger is sharper, 1000 is very sharp, 10 is very dull)
+   //      } );
+   //   
+   //   wo->setLabel( "Grass" );
+   //   worldLst->push_back( wo );
+   //}
 
    //{
    //   //Create the infinite grass plane that uses the Open Dynamics Engine (ODE)
