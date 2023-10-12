@@ -248,8 +248,8 @@ void Aftr::GLViewHeatmap::loadMap()
             auto &vertices = wo->getModel()->getCompositeVertexList();
             for (int i = 0; i < vertices.size(); i++) {
                 auto z = (noise.Evaluate(vertices[i][0] * 256, vertices[i][1] * 256) * 100) + 5;
-                vertices[i][2] = z;
-                //std::cout << vertices[i].toString() << std::endl;
+                //vertices[i][2] = z;
+                std::cout << vertices[i].toString() << std::endl;
             }
          } );
       
