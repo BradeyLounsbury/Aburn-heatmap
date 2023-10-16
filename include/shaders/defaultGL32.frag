@@ -173,6 +173,6 @@ void main()
    else
       color = doADS_Textures();
       
-   //FragColor = vec4(1,0,1,1);
+   //FragColor = vec4(255,0,1,255);
    FragColor = color;
 }
