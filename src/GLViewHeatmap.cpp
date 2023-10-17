@@ -461,7 +461,7 @@ void Aftr::GLViewHeatmap::loadMap()
    std::string wheeledCar( ManagerEnvironmentConfiguration::getSMM() + "/models/rcx_treads.wrl" );
    std::string grass( ManagerEnvironmentConfiguration::getSMM() + "/models/grassFloor400x400_pp.wrl" );
    std::string human( ManagerEnvironmentConfiguration::getSMM() + "/models/human_chest.wrl" );
-   std::string grid(ManagerEnvironmentConfiguration::getLMM() + "/models/grid.fbx");
+   std::string grid(ManagerEnvironmentConfiguration::getLMM() + "/models/grid2.wrl");
 
    OpenSimplexNoise noise;
 
