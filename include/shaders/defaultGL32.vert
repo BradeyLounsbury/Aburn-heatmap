@@ -33,17 +33,22 @@ out vec3 NormalES; //eye space Vertex Normal Vector
 out vec2 TexCoord;
 out vec4 ShadowCoord;
 out flat int ShadowMapShadingState; //Set to non-zero value when generating a shadow map (only filling the depth buffer)
+out vec3 new_vpos;
 
 void main()
 {
+   new_vpos = VertexPosition;
+   if (VertexPosition.x < 25 || VertexPosition.y < 25) {
+	new_vpos.z += 0;
+   }
    Color = VertexColor;
    NormalES = ( Cam.View * ModelMat * vec4( VertexNormal, 0 ) ).xyz;
-   VertexES = ( Cam.View * ModelMat * vec4( VertexPosition, 1 ) ).xyz;
+   VertexES = ( Cam.View * ModelMat * vec4( new_vpos, 1 ) ).xyz;
    TexCoord = ( TexMat0 * vec4( VertexTexCoord, 0, 1 ) ).st;   
    
-   ShadowCoord =  Cam.Shadow *  ModelMat * vec4( VertexPosition, 1 );
+   ShadowCoord =  Cam.Shadow *  ModelMat * vec4( new_vpos, 1 );
    ShadowMapShadingState = Cam.ShadowMapShadingState; // pass to fragment shader
    
    //gl_Position is in clip space
-   gl_Position = MVPMat * vec4( VertexPosition, 1.0 );
+   gl_Position = MVPMat * vec4( new_vpos, 1.0 );
 }

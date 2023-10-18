@@ -36,7 +36,7 @@
 #include "AftrGLRendererBase.h"
 #include "OpenSimplexNoise.h"
 #include "ModelMeshRenderDataGenerator.h"
-#include "GLSLShader.h"
+#include "GLSLShaderDefaultGL32.h"
 #include "GLSLUniform.h"
 #include "MGLPointSetShaderAccelerated.h"
 #include "WRLParser.h"
@@ -225,6 +225,43 @@ void GLViewHeatmap::onKeyDown( const SDL_KeyboardEvent& key )
        grid2->setLabel("Grid2");
        grid2->isVisible = true;
        worldLst->push_back(grid2);
+   }
+
+   if (key.keysym.sym == SDLK_3) {
+       WO* wo = nullptr;
+       for (int i = 0; i < this->worldLst->size(); i++) {
+           if (this->worldLst->at(i)->getLabel() == "Grid") {
+               wo = this->worldLst->at(i);
+           }
+       }
+
+       class GLSLShaderGrid : public GLSLShaderDefaultGL32
+       {
+       protected:
+           GLSLShaderGrid(GLSLShaderDataShared* s) : GLSLShaderDefaultGL32(s)
+           {
+
+           }
+       public:
+           static GLSLShaderGrid* New()
+           {
+               std::string vert = ManagerEnvironmentConfiguration::getLMM() + "/shaders/defaultGL32.vert";
+               std::string frag = ManagerEnvironmentConfiguration::getLMM() + "/shaders/defaultGL32.frag";
+
+               GLSLShaderDataShared* data = ManagerShader::loadShaderDataShared(vert, frag);
+               if (data == nullptr)
+                   return nullptr;
+
+               GLSLShaderGrid* ptr = new GLSLShaderGrid(data);
+               return ptr;
+           }
+       };
+
+       ModelMeshSkin skin(ManagerTex::loadTexAsync(ManagerEnvironmentConfiguration::getLMM() + "/models/grass.bmp").value(), GLSLShaderGrid::New());
+       skin.setMeshShadingType(MESH_SHADING_TYPE::mstFLAT);
+       wo->getModel()->getSkins().push_back(std::move(skin));
+
+       wo->getModel()->useNextSkin();
    }
 
    if( key.keysym.sym == SDLK_1 )
@@ -461,7 +498,7 @@ void Aftr::GLViewHeatmap::loadMap()
    std::string wheeledCar( ManagerEnvironmentConfiguration::getSMM() + "/models/rcx_treads.wrl" );
    std::string grass( ManagerEnvironmentConfiguration::getSMM() + "/models/grassFloor400x400_pp.wrl" );
    std::string human( ManagerEnvironmentConfiguration::getSMM() + "/models/human_chest.wrl" );
-   std::string grid(ManagerEnvironmentConfiguration::getLMM() + "/models/grid2.wrl");
+   std::string grid(ManagerEnvironmentConfiguration::getLMM() + "/models/grid.fbx");
 
    OpenSimplexNoise noise;
 
@@ -543,37 +580,6 @@ void Aftr::GLViewHeatmap::loadMap()
        wo->upon_async_model_loaded([wo]()
            {
                ModelMeshSkin& grassSkin = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getSkins().at(0);
-
-               std::string local = ManagerEnvironmentConfiguration::getSMM();
-               std::string vert = local + "/shaders/defaultGL32.vert";
-               std::string frag = local + "/shaders/defaultGL32.frag";
-               //grassSkin.setShader(ManagerShader::loadShader(vert, frag));
-
-               //auto shader = GLSLShader::New(local + "/shaders/defaultGL32.vert", local + "/shaders/defaultGL32.frag", "", GL_TRIANGLES, GL_TRIANGLE_STRIP, 3);
-               //grassSkin.setShader(shader);
-               //GLSLShader* shader = grassSkin.getShader();
-
-               ////Per vertex attributes
-               //shader->addAttribute(new GLSLAttribute("VertexPosition", atVEC3, shader));
-               //shader->addAttribute(new GLSLAttribute("VertexNormal", atVEC3, shader));
-               //shader->addAttribute(new GLSLAttribute("VertexTexCoord", atVEC2, shader));
-               //shader->addAttribute(new GLSLAttribute("VertexColor", atVEC4, shader));
-
-               ////Useful Matrices
-               //shader->addUniform(new GLSLUniform("ModelMat", utMAT4, shader->getHandle()));  //0
-               //shader->addUniform(new GLSLUniform("NormalMat", utMAT4, shader->getHandle())); //1
-               //shader->addUniform(new GLSLUniform("TexMat0", utMAT4, shader->getHandle()));   //2
-               //shader->addUniform(new GLSLUniform("MVPMat", utMAT4, shader->getHandle()));    //3
-               //shader->addUniform(new GLSLUniform("TexUnit0", utSAMPLER2D, shader->getHandle())); //4
-
-               ////Material Properties
-               //shader->addUniform(new GLSLUniform("Material.Ka", utVEC4, shader->getHandle())); //5
-               //shader->addUniform(new GLSLUniform("Material.Kd", utVEC4, shader->getHandle())); //6
-               //shader->addUniform(new GLSLUniform("Material.Ks", utVEC4, shader->getHandle())); //7
-               //shader->addUniform(new GLSLUniform("Material.SpecularCoeff", utFLOAT, shader->getHandle())); //8
-
-               ////ShadowMap sampler
-               //shader->addUniform(new GLSLUniform("ShadowMap", utSAMPLER2DSHADOW, shader->getHandle())); //9
 
                grassSkin.getMultiTextureSet().at(0).setTexRepeats(5.0f);
                grassSkin.setAmbient(aftrColor4f(0.4f, 0.4f, 0.4f, 1.0f)); //Color of object when it is not in any light
