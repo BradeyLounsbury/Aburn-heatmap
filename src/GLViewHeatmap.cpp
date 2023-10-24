@@ -43,6 +43,11 @@
 
 using namespace Aftr;
 
+static int seed = 0.0;
+static int scale = 0;
+static bool load_heatmap, animate = false;
+static int grid_id = -1;
+
 GLViewHeatmap* GLViewHeatmap::New( const std::vector< std::string >& args )
 {
    GLViewHeatmap* glv = new GLViewHeatmap( args );
@@ -87,18 +92,122 @@ void GLViewHeatmap::onCreate()
    //this->setNumPhysicsStepsPerRender( 0 ); //pause physics engine on start up; will remain paused till set to 1
 }
 
+void set_grid_id(unsigned int id) {
+    grid_id = id;
+}
+
+int generate_heatmap_step(WO* wo, int step, int max) {
+    OpenSimplexNoise noise(seed);
+
+    float verts[3];
+    auto og_verts = wo->getModel()->getCompositeVertexList();
+    verts[0] = float(og_verts[step][0]);
+    verts[1] = float(og_verts[step][1]);
+    verts[2] = float(og_verts[step][2]);
+
+    float z = 0;
+    auto n = noise.Evaluate(verts[0] * 256, verts[1] * 256) * scale;
+    if (n > 0) {
+        if (n > max) max = n;
+        z = n;
+    }
+    verts[2] = z;
+
+    auto loc = glGetUniformLocation(34, "max_height");
+    glProgramUniform1f(34, loc, max);
+
+    auto stride = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVtxStride();
+    auto size = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVtxSize();
+    auto offset = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVertsOffset();
+
+    auto buffer = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVBOVtx();
+
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+
+    glBufferSubData(GL_ARRAY_BUFFER, (step * stride) + offset, sizeof(float) * 3, verts);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    return max;
+}
+
+void generate_heatmap(WO* wo) {
+    OpenSimplexNoise noise(seed);
+
+    std::vector<float> verts;
+    auto og_verts = wo->getModel()->getCompositeVertexList();
+    for (size_t i = 0; i < og_verts.size(); ++i) {
+        verts.push_back(float(og_verts[i][0]));
+        verts.push_back(float(og_verts[i][1]));
+        verts.push_back(float(og_verts[i][2]));
+    }
+
+    float max = 0;
+    for (int i = 0; i < verts.size(); i += 3) {
+        float z = 0;
+        auto n = noise.Evaluate(verts[i] * 256, verts[i + 1] * 256) * scale;
+        if (n > 0) {
+            if (n > max) max = n;
+            z = n;
+        }
+        //z = 0;
+        verts[i + 2] = z;
+    }
+    float* va = verts.data();
+
+    std::cout << "max = " << max << std::endl;
+
+    auto loc = glGetUniformLocation(34, "max_height");
+    glProgramUniform1f(34, loc, max);
+
+    auto stride = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVtxStride();
+    auto size = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVtxSize();
+    auto offset = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVertsOffset();
+
+    auto buffer = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVBOVtx();
+
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+
+    float sub_va[3]{ va[0], va[1], va[2] };
+    int pos = 0;
+    for (auto i = offset; i < size * stride; i += stride) {
+        sub_va[pos % 3] = va[pos];
+        sub_va[pos % 3 + 1] = va[pos + 1];
+        sub_va[pos % 3 + 2] = va[pos + 2];
+        glBufferSubData(GL_ARRAY_BUFFER, i, sizeof(float) * 3, sub_va);
+        pos += 3;
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
 
 GLViewHeatmap::~GLViewHeatmap()
 {
    //Implicitly calls GLView::~GLView()
 }
 
-
+static int counter, step, max = 0;
 void GLViewHeatmap::updateWorld()
 {
    GLView::updateWorld(); //Just call the parent's update world first.
                           //If you want to add additional functionality, do it after
                           //this call.
+
+   if (load_heatmap && !animate) {
+       generate_heatmap(this->worldLst->getWOByID(grid_id));
+       load_heatmap = false;
+   }
+
+   if (animate) {
+       max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
+       step++;
+       /*if (counter == 0) {
+           max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
+           step++;
+           counter = 5;
+       }
+       else {
+           counter--;
+       }*/
+   }
 }
 
 
@@ -228,102 +337,7 @@ void GLViewHeatmap::onKeyDown( const SDL_KeyboardEvent& key )
    }
 
    if (key.keysym.sym == SDLK_3) {
-       WO* wo = nullptr;
-       for (int i = 0; i < this->worldLst->size(); i++) {
-           if (this->worldLst->at(i)->getLabel() == "Grid") {
-               wo = this->worldLst->at(i);
-           }
-       }
-
-       class GLSLShaderGrid : public GLSLShaderDefaultGL32
-       {
-       protected:
-           GLSLShaderGrid(GLSLShaderDataShared* s) : GLSLShaderDefaultGL32(s)
-           {
-
-           }
-       public:
-           static GLSLShaderGrid* New()
-           {
-               std::string vert = ManagerEnvironmentConfiguration::getLMM() + "/shaders/defaultGL32.vert";
-               std::string frag = ManagerEnvironmentConfiguration::getLMM() + "/shaders/defaultGL32.frag";
-
-               GLSLShaderDataShared* data = ManagerShader::loadShaderDataShared(vert, frag);
-               if (data == nullptr)
-                   return nullptr;
-
-               GLSLShaderGrid* ptr = new GLSLShaderGrid(data);
-               return ptr;
-           }
-       };
-
-       ModelMeshSkin skin(ManagerTex::loadTexAsync(ManagerEnvironmentConfiguration::getLMM() + "/models/Solid_black.png").value(), GLSLShaderGrid::New());
-       skin.setMeshShadingType(MESH_SHADING_TYPE::mstSMOOTH);
-       wo->getModel()->getSkins().push_back(std::move(skin));
-
-       wo->getModel()->useNextSkin();
-
-       /*std::cout << "Color offset: " << wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getColorsOffset() << std::endl;
-       std::cout << "Normal offset: " << wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getNormalsOffset() << std::endl;
-       std::cout << "Normal verts: " << wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getNormalVertsOffset() << std::endl;
-       std::cout << "Normal Color offset: " << wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getNormalColorsOffset() << std::endl;
-       std::cout << "Verts offset: " << wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getVertsOffset() << std::endl;
-       std::cout << "Verts size: " << wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getVtxSize() << std::endl;
-       std::cout << "Verts stride: " << wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getVtxStride() << std::endl;*/
-
-       OpenSimplexNoise noise;
-
-       std::vector<float> verts;
-       auto og_verts = wo->getModel()->getCompositeVertexList();
-       for (size_t i = 0; i < og_verts.size(); ++i) {
-           verts.push_back(float(og_verts[i][0]));
-           verts.push_back(float(og_verts[i][1]));
-           verts.push_back(float(og_verts[i][2]));
-       }
-
-       float max = 0;
-       for (int i = 0; i < verts.size(); i += 3) {
-           float z = 0;
-           auto n = noise.Evaluate(verts[i] * 256, verts[i + 1] * 256) * 3;
-           if (n > 0) {
-               if (n > max) max = n;
-               z = n;
-           }
-            //z = 0;
-            verts[i + 2] = z;
-       }
-       float* va = verts.data();
-
-       std::cout << "max = " << max << std::endl;
-
-       auto stride = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVtxStride();
-       auto size = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVtxSize();
-       auto offset = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVertsOffset();
-
-       auto buffer = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVBOVtx();
-
-       glBindBuffer(GL_ARRAY_BUFFER, buffer);
-       /*GLubyte* buffer_data = (GLubyte *)malloc(sizeof(GLubyte) * size * stride);
-       auto data_size = sizeof(float) * size;
-       std::cout << sizeof(float) << " * " << size << " * " << stride << " = " << data_size << std::endl;
-       glGetBufferSubData(GL_ARRAY_BUFFER, 0, data_size, buffer_data);
-       for (int i = 0; i < data_size; i+=3) {
-           std::cout << (float)buffer_data[i] << ", ";
-           std::cout << (float)buffer_data[i+1] << ", ";
-           std::cout << (float)buffer_data[i+2] << ", ";
-       }
-       std::cout << std::endl;*/
-       float sub_va[3]{va[0], va[1], va[2]};
-       int pos = 0;
-       //glBufferSubData(GL_ARRAY_BUFFER, offset, sizeof(float) * 3, sub_va);
-       for (auto i = offset; i < size * stride; i += stride) {
-           sub_va[pos % 3] = va[pos];
-           sub_va[pos % 3 + 1] = va[pos+1];
-           sub_va[pos % 3 + 2] = va[pos+2];
-           glBufferSubData(GL_ARRAY_BUFFER, i, sizeof(float) * 3, sub_va);
-           pos += 3;
-       }
-       glBindBuffer(GL_ARRAY_BUFFER, 0);
+       
    }
 
    if( key.keysym.sym == SDLK_1 )
@@ -642,10 +656,39 @@ void Aftr::GLViewHeatmap::loadMap()
                grassSkin.setSpecularCoefficient(10); // How "sharp" are the specular highlights (bigger is sharper, 1000 is very sharp, 10 is very dull)
 
                std::cout << "\nSKIN: " << grassSkin.toString() << std::endl;
+
+               class GLSLShaderGrid : public GLSLShaderDefaultGL32
+               {
+               protected:
+                   GLSLShaderGrid(GLSLShaderDataShared* s) : GLSLShaderDefaultGL32(s)
+                   {
+
+                   }
+               public:
+                   static GLSLShaderGrid* New()
+                   {
+                       std::string vert = ManagerEnvironmentConfiguration::getLMM() + "/shaders/defaultGL32.vert";
+                       std::string frag = ManagerEnvironmentConfiguration::getLMM() + "/shaders/defaultGL32.frag";
+
+                       GLSLShaderDataShared* data = ManagerShader::loadShaderDataShared(vert, frag);
+                       if (data == nullptr)
+                           return nullptr;
+
+                       GLSLShaderGrid* ptr = new GLSLShaderGrid(data);
+                       return ptr;
+                   }
+               };
+
+               ModelMeshSkin skin(ManagerTex::loadTexAsync(ManagerEnvironmentConfiguration::getLMM() + "/models/Solid_black.png").value(), GLSLShaderGrid::New());
+               skin.setMeshShadingType(MESH_SHADING_TYPE::mstSMOOTH);
+               wo->getModel()->getSkins().push_back(std::move(skin));
+
+               wo->getModel()->useNextSkin();
            });
 
        wo->setLabel("Grid");
        wo->isVisible = true;
+       set_grid_id(wo->getID());
        worldLst->push_back(wo);
    }
 
@@ -766,16 +809,29 @@ void Aftr::GLViewHeatmap::loadMap()
    //Make a Dear Im Gui instance via the WOImGui in the engine... This calls
    //the default Dear ImGui demo that shows all the features... To create your own,
    //inherit from WOImGui and override WOImGui::drawImGui_for_this_frame(...) (among any others you need).
-   //WOImGui* gui = WOImGui::New( nullptr );
-   //gui->setLabel( "My Gui" );
-   //gui->subscribe_drawImGuiWidget(
-   //   [this, gui]() //this is a lambda, the capture clause is in [], the input argument list is in (), and the body is in {}
-   //   {
-   //      ImGui::ShowDemoWindow(); //Displays the default ImGui demo from C:/repos/aburn/engine/src/imgui_implot/implot_demo.cpp
-   //      WOImGui::draw_AftrImGui_Demo( gui ); //Displays a small Aftr Demo from C:/repos/aburn/engine/src/aftr/WOImGui.cpp
-   //      ImPlot::ShowDemoWindow(); //Displays the ImPlot demo using ImGui from C:/repos/aburn/engine/src/imgui_implot/implot_demo.cpp
-   //   } );
-   //this->worldLst->push_back( gui );
+   WOImGui* gui = WOImGui::New( nullptr );
+   gui->setLabel( "My Gui" );
+   gui->subscribe_drawImGuiWidget(
+      [this, gui]() //this is a lambda, the capture clause is in [], the input argument list is in (), and the body is in {}
+      {
+           ImGui::Begin("Heatmap Gui");
+
+           ImGui::SliderInt("Seed", &seed, 0, 100);
+           ImGui::SliderInt("Scale", &scale, 0, 100);
+
+           ImGui::Separator();
+
+           if (ImGui::Button("Load Heatmap")) {
+               load_heatmap = true;
+           }
+           ImGui::SameLine();
+           if (ImGui::Button("Animate")) {
+               animate = true;
+           }
+
+           ImGui::End();
+      } );
+   this->worldLst->push_back( gui );
 
    //createHeatmapWayPoints();
 }

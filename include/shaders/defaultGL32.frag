@@ -14,6 +14,8 @@ in vec4 ShadowCoord;
 in flat int ShadowMapShadingState;
 in vec3 VertexPos;
 
+uniform float max_height;
+
 struct MaterialInfo
 {
    vec4 Ka; //Ambient
@@ -125,7 +127,7 @@ vec4 doADS_Textures()
    vec4 specular = vec4(0,0,0,0);
    vec4 texColor = texture( TexUnit0, TexCoord );
 
-   float max_height = 3;
+   //float max_height = 3;
    float percent_of_max = VertexPos.z / max_height;
    float height_in_degrees = percent_of_max * 300;
 
