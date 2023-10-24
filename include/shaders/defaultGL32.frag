@@ -12,6 +12,7 @@ in vec3 NormalES;
 in vec2 TexCoord;
 in vec4 ShadowCoord;
 in flat int ShadowMapShadingState;
+in vec3 VertexPos;
 
 struct MaterialInfo
 {
@@ -123,6 +124,14 @@ vec4 doADS_Textures()
    vec4 diffuse  = vec4(0,0,0,0);
    vec4 specular = vec4(0,0,0,0);
    vec4 texColor = texture( TexUnit0, TexCoord );
+
+   if (VertexPos.z < 1.5) {
+      texColor = vec4(0,0,1,1);
+   } else if (VertexPos.z > 1.5 && VertexPos.z < 3.0) {
+      texColor = vec4(0,1,0,1);
+   } else {
+      texColor = vec4(1,0,0,1);
+   }
    
    for( int i = 0; i < Lights.NumLights; ++i )
       doADS( i, ambient, diffuse, specular );
