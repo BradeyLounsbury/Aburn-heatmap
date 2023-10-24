@@ -257,11 +257,73 @@ void GLViewHeatmap::onKeyDown( const SDL_KeyboardEvent& key )
            }
        };
 
-       ModelMeshSkin skin(ManagerTex::loadTexAsync(ManagerEnvironmentConfiguration::getLMM() + "/models/grass.bmp").value(), GLSLShaderGrid::New());
-       skin.setMeshShadingType(MESH_SHADING_TYPE::mstFLAT);
+       ModelMeshSkin skin(ManagerTex::loadTexAsync(ManagerEnvironmentConfiguration::getLMM() + "/models/Solid_black.png").value(), GLSLShaderGrid::New());
+       skin.setMeshShadingType(MESH_SHADING_TYPE::mstSMOOTH);
        wo->getModel()->getSkins().push_back(std::move(skin));
 
        wo->getModel()->useNextSkin();
+
+       /*std::cout << "Color offset: " << wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getColorsOffset() << std::endl;
+       std::cout << "Normal offset: " << wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getNormalsOffset() << std::endl;
+       std::cout << "Normal verts: " << wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getNormalVertsOffset() << std::endl;
+       std::cout << "Normal Color offset: " << wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getNormalColorsOffset() << std::endl;
+       std::cout << "Verts offset: " << wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getVertsOffset() << std::endl;
+       std::cout << "Verts size: " << wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getVtxSize() << std::endl;
+       std::cout << "Verts stride: " << wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getVtxStride() << std::endl;*/
+
+       OpenSimplexNoise noise;
+
+       std::vector<float> verts;
+       auto og_verts = wo->getModel()->getCompositeVertexList();
+       for (size_t i = 0; i < og_verts.size(); ++i) {
+           verts.push_back(float(og_verts[i][0]));
+           verts.push_back(float(og_verts[i][1]));
+           verts.push_back(float(og_verts[i][2]));
+       }
+
+       float max = 0;
+       for (int i = 0; i < verts.size(); i += 3) {
+           float z = 0;
+           auto n = noise.Evaluate(verts[i] * 256, verts[i + 1] * 256) * 5;
+           if (n > 0) {
+               if (n > max) max = n;
+               z = n;
+           }
+            //z = 0;
+            verts[i + 2] = z;
+       }
+       float* va = verts.data();
+
+       std::cout << "max = " << max << std::endl;
+
+       auto stride = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVtxStride();
+       auto size = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVtxSize();
+       auto offset = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVertsOffset();
+
+       auto buffer = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVBOVtx();
+
+       glBindBuffer(GL_ARRAY_BUFFER, buffer);
+       /*GLubyte* buffer_data = (GLubyte *)malloc(sizeof(GLubyte) * size * stride);
+       auto data_size = sizeof(float) * size;
+       std::cout << sizeof(float) << " * " << size << " * " << stride << " = " << data_size << std::endl;
+       glGetBufferSubData(GL_ARRAY_BUFFER, 0, data_size, buffer_data);
+       for (int i = 0; i < data_size; i+=3) {
+           std::cout << (float)buffer_data[i] << ", ";
+           std::cout << (float)buffer_data[i+1] << ", ";
+           std::cout << (float)buffer_data[i+2] << ", ";
+       }
+       std::cout << std::endl;*/
+       float sub_va[3]{va[0], va[1], va[2]};
+       int pos = 0;
+       //glBufferSubData(GL_ARRAY_BUFFER, offset, sizeof(float) * 3, sub_va);
+       for (auto i = offset; i < size * stride; i += stride) {
+           sub_va[pos % 3] = va[pos];
+           sub_va[pos % 3 + 1] = va[pos+1];
+           sub_va[pos % 3 + 2] = va[pos+2];
+           glBufferSubData(GL_ARRAY_BUFFER, i, sizeof(float) * 3, sub_va);
+           pos += 3;
+       }
+       glBindBuffer(GL_ARRAY_BUFFER, 0);
    }
 
    if( key.keysym.sym == SDLK_1 )
@@ -355,7 +417,7 @@ void GLViewHeatmap::onKeyDown( const SDL_KeyboardEvent& key )
 
        //glBindBuffer(GL_ARRAY_BUFFER, buffer);
 
-       //glGetBufferSubData(GL_ARRAY_BUFFER, 0, 1800, data);
+       //glBufferSubData(GL_ARRAY_BUFFER, 0, 1800, va);
 
        for (int i = 0; i < 1800; i++) {
            //std::cout << va[i] << std::endl;
@@ -498,7 +560,7 @@ void Aftr::GLViewHeatmap::loadMap()
    std::string wheeledCar( ManagerEnvironmentConfiguration::getSMM() + "/models/rcx_treads.wrl" );
    std::string grass( ManagerEnvironmentConfiguration::getSMM() + "/models/grassFloor400x400_pp.wrl" );
    std::string human( ManagerEnvironmentConfiguration::getSMM() + "/models/human_chest.wrl" );
-   std::string grid(ManagerEnvironmentConfiguration::getLMM() + "/models/grid.fbx");
+   std::string grid(ManagerEnvironmentConfiguration::getLMM() + "/models/grid_no_tex.obj");
 
    OpenSimplexNoise noise;
 
@@ -564,15 +626,7 @@ void Aftr::GLViewHeatmap::loadMap()
    }
 
    {
-       WO* wo = WO::New(grid, Vector(0.5, 0.5, 0.5), MESH_SHADING_TYPE::mstFLAT);
-
-       //for( size_t i = 0; i < this->grass->getModel()->getCompositeIndexList()->size(); ++i )
-       //for (size_t i = 0; i < wo->getModel()->getCompositeVertexList().size(); ++i)
-       //{
-       //    //indices.push_back( this->grass->getModel()->getCompositeIndexList()->at(i) );
-       //    indices.push_back(i);
-       //}
-
+       WO* wo = WO::New(grid, Vector(75,75,75), MESH_SHADING_TYPE::mstSMOOTH);
        
 
        wo->setPosition(Vector(50, 50, 0));
@@ -593,61 +647,6 @@ void Aftr::GLViewHeatmap::loadMap()
        wo->setLabel("Grid");
        wo->isVisible = true;
        worldLst->push_back(wo);
-   }
-
-   {
-       
-   }
-
-   {
-       OpenSimplexNoise noise;
-       /*std::vector<std::vector<VectorD>> grid;
-       std::vector<std::vector<aftrColor4ub>> color_list;
-
-       for (int i = 0; i < 50; i++) {
-           std::vector<VectorD> row;
-           std::vector<aftrColor4ub> colors;
-           
-           for (int j = 0; j < 50; j++) {
-               if (i == 0 || i == 49 || j == 0 || j == 49) {
-                   row.push_back(VectorD(i, j, 0));
-                   colors.push_back(aftrColor4ub(255, 255, 255, 0));
-               }
-               else {
-                   auto z = (noise.Evaluate(i * 256, j * 256) * 5) + 5;
-
-                   row.push_back(VectorD(i, j, z));
-                   colors.push_back(aftrColor4ub(255, 255, 255, 0));
-               }
-           }
-           color_list.push_back(colors);
-           grid.push_back(row);
-       }*/
-
-       std::vector<Vector> verts;
-       std::vector<unsigned int> indices;
-       for (int i = 0; i < 50; i++) {
-           for (int j = 0; j < 50; j++) {
-               if (i != 0 && i != 49 && j != 0 && j != 49) {
-                   auto z = (noise.Evaluate(i * 256, j * 256) * 5) + 5;
-                   verts.push_back(Vector(i, j, z));
-               }
-               else {
-                   verts.push_back(Vector(i, j, 0));
-               }
-               indices.push_back(i + j);
-           }
-       }
-
-       VectorD scale = VectorD(1, 1, 1);
-
-       ////WO* wo = WO::New(grid, scale, color_list);
-       //WO* wo = WO::New();
-       //MGLPointSetShaderAccelerated::New(wo, verts, indices);
-
-       //wo->setPosition(Vector(-50, -50, 0));
-       //wo->setLabel("MGL Grid");
-       //worldLst->push_back(wo);
    }
 
    //{ 
