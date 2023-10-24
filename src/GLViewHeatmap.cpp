@@ -199,6 +199,14 @@ void GLViewHeatmap::updateWorld()
    if (animate) {
        max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
        step++;
+       max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
+       step++;
+       max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
+       step++;
+       max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
+       step++;
+       max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
+       step++;
        /*if (counter == 0) {
            max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
            step++;
@@ -565,7 +573,7 @@ void Aftr::GLViewHeatmap::loadMap()
    ManagerOpenGLState::GL_CLIPPING_PLANE = 1000.0;
    ManagerOpenGLState::GL_NEAR_PLANE = 0.1f;
    ManagerOpenGLState::enableFrustumCulling = false;
-   Axes::isVisible = true;
+   Axes::isVisible = false;
    this->glRenderer->isUsingShadowMapping( false ); //set to TRUE to enable shadow mapping, must be using GL 3.2+
 
    this->cam->setPosition( 0,100,20 );
@@ -574,7 +582,7 @@ void Aftr::GLViewHeatmap::loadMap()
    std::string wheeledCar( ManagerEnvironmentConfiguration::getSMM() + "/models/rcx_treads.wrl" );
    std::string grass( ManagerEnvironmentConfiguration::getSMM() + "/models/grassFloor400x400_pp.wrl" );
    std::string human( ManagerEnvironmentConfiguration::getSMM() + "/models/human_chest.wrl" );
-   std::string grid(ManagerEnvironmentConfiguration::getLMM() + "/models/grid_no_tex.obj");
+   std::string grid(ManagerEnvironmentConfiguration::getLMM() + "/models/new_grid.obj");
 
    OpenSimplexNoise noise;
 
@@ -640,7 +648,7 @@ void Aftr::GLViewHeatmap::loadMap()
    }
 
    {
-       WO* wo = WO::New(grid, Vector(75,75,75), MESH_SHADING_TYPE::mstSMOOTH);
+       WO* wo = WO::New(grid, Vector(50,50,50), MESH_SHADING_TYPE::mstSMOOTH);
        
 
        wo->setPosition(Vector(50, 50, 0));
