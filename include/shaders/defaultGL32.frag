@@ -125,22 +125,25 @@ vec4 doADS_Textures()
    vec4 specular = vec4(0,0,0,0);
    vec4 texColor = texture( TexUnit0, TexCoord );
 
-   float max_height = 4.1;
+   float max_height = 3;
    float percent_of_max = VertexPos.z / max_height;
-   float height_in_degrees = percent_of_max * 240;
+   float height_in_degrees = percent_of_max * 300;
 
    if (height_in_degrees < 60) {
       float x = 1 - abs(mod((height_in_degrees / 60), 2) - 1);
-      texColor = vec4(0, x, 255, 1);
-   } else if (height_in_degrees < 120) {
-      float x = 1 - abs(mod((height_in_degrees / 120), 2) - 1);
-      texColor = vec4(0, 255, x, 1);
-   } else if (height_in_degrees < 180) {
-      float x = 1 - abs(mod((height_in_degrees / 180), 2) - 1);
-      texColor = vec4(x, 255, 0, 1);
-   } else if (height_in_degrees < 240) {
-      float x = 1 - abs(mod((height_in_degrees / 240), 2) - 1);
-      texColor = vec4(255, x, 0, 1);
+      texColor = vec4(0, x, 1, 1);
+   } else if (height_in_degrees <= 120) {
+      float x = ((height_in_degrees - 60) / 60);
+      texColor = vec4(0, 1, 1-x, 1);
+   } else if (height_in_degrees <= 180) {
+      float x = ((height_in_degrees - 120) / 60);
+      texColor = vec4(x, 1, 0, 1);
+   } else if (height_in_degrees <= 240) {
+      float x = ((height_in_degrees - 180) / 60);
+      texColor = vec4(1, 1-x, 0, 1);
+   } else if (height_in_degrees <= 300) {
+      float x = ((height_in_degrees - 240) / 60);
+      texColor = vec4(1, 0, x, 1);
    }
 
    

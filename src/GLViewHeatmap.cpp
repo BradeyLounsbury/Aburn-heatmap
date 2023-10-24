@@ -169,7 +169,7 @@ void GLViewHeatmap::onKeyDown( const SDL_KeyboardEvent& key )
 
        std::cout << path << std::endl;
 
-       WRLParser::send_to_file(verts, indices, path);
+       //WRLParser::send_to_file(verts, indices, path);
 
        std::cout << "sent to file\n";
 
@@ -284,7 +284,7 @@ void GLViewHeatmap::onKeyDown( const SDL_KeyboardEvent& key )
        float max = 0;
        for (int i = 0; i < verts.size(); i += 3) {
            float z = 0;
-           auto n = noise.Evaluate(verts[i] * 256, verts[i + 1] * 256) * 5;
+           auto n = noise.Evaluate(verts[i] * 256, verts[i + 1] * 256) * 3;
            if (n > 0) {
                if (n > max) max = n;
                z = n;
