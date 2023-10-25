@@ -191,20 +191,13 @@ void GLViewHeatmap::updateWorld()
                           //If you want to add additional functionality, do it after
                           //this call.
 
-   if (load_heatmap && !animate) {
+   if (load_heatmap) {
        generate_heatmap(this->worldLst->getWOByID(grid_id));
        load_heatmap = false;
+       animate = false;
    }
 
    if (animate) {
-       max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
-       step++;
-       max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
-       step++;
-       max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
-       step++;
-       max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
-       step++;
        max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
        step++;
        /*if (counter == 0) {
@@ -248,313 +241,6 @@ void GLViewHeatmap::onKeyDown( const SDL_KeyboardEvent& key )
    GLView::onKeyDown( key );
    if( key.keysym.sym == SDLK_0 )
       this->setNumPhysicsStepsPerRender( 1 );
-
-   if (key.keysym.sym == SDLK_2) {
-       WO* wo = nullptr;
-       for (int i = 0; i < this->worldLst->size(); i++) {
-           if (this->worldLst->at(i)->getLabel() == "Grid") {
-               wo = this->worldLst->at(i);
-           }
-       }
-
-       std::vector< Vector > verts;
-       std::vector< unsigned int > indices;
-       auto og_verts = wo->getModel()->getCompositeVertexList();
-       for (size_t i = 0; i < og_verts.size(); ++i) {
-           verts.push_back(og_verts.at(i));
-       }
-
-       OpenSimplexNoise noise;
-
-       for (int i = 0; i < verts.size(); i++) {
-           if (verts[i][0] > 40 || verts[i][0] < -40 || verts[i][1] < -40 || verts[i][1] > 40) {
-               //std::cout << verts[i][0] << ", " << verts[i][1] << std::endl;
-           }
-           else {
-               auto z = (noise.Evaluate(verts[i][0] * 256, verts[i][1] * 256) * 5) + 5;
-               verts[i][2] = z;
-           }
-
-       }
-
-       auto og_idx = wo->getModel()->getCompositeIndexList();
-       for (size_t i = 0; i < og_idx.size(); ++i) {
-           indices.push_back(og_idx.at(i));
-       }
-
-       std::string path = ManagerEnvironmentConfiguration::getLMM() + "/models/grid.wrl";
-
-       std::cout << path << std::endl;
-
-       //WRLParser::send_to_file(verts, indices, path);
-
-       std::cout << "sent to file\n";
-
-       std::string grid(ManagerEnvironmentConfiguration::getLMM() + "/models/grid.wrl");
-       WO* grid2 = WO::New(grid, Vector(0.5, 0.5, 0.5), MESH_SHADING_TYPE::mstSMOOTH);
-
-       grid2->setPosition(Vector(50, 50, 0));
-       grid2->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
-       grid2->upon_async_model_loaded([grid2]()
-           {
-               ModelMeshSkin& grassSkin = grid2->getModel()->getModelDataShared()->getModelMeshes().at(0)->getSkins().at(0);
-
-               std::string local = ManagerEnvironmentConfiguration::getSMM();
-               std::string vert = local + "/shaders/defaultGL32.vert";
-               std::string frag = local + "/shaders/defaultGL32.frag";
-               //grassSkin.setShader(ManagerShader::loadShader(vert, frag));
-
-               //auto shader = GLSLShader::New(local + "/shaders/defaultGL32.vert", local + "/shaders/defaultGL32.frag", "", GL_TRIANGLES, GL_TRIANGLE_STRIP, 3);
-               //grassSkin.setShader(shader);
-               //GLSLShader* shader = grassSkin.getShader();
-
-               ////Per vertex attributes
-               //shader->addAttribute(new GLSLAttribute("VertexPosition", atVEC3, shader));
-               //shader->addAttribute(new GLSLAttribute("VertexNormal", atVEC3, shader));
-               //shader->addAttribute(new GLSLAttribute("VertexTexCoord", atVEC2, shader));
-               //shader->addAttribute(new GLSLAttribute("VertexColor", atVEC4, shader));
-
-               ////Useful Matrices
-               //shader->addUniform(new GLSLUniform("ModelMat", utMAT4, shader->getHandle()));  //0
-               //shader->addUniform(new GLSLUniform("NormalMat", utMAT4, shader->getHandle())); //1
-               //shader->addUniform(new GLSLUniform("TexMat0", utMAT4, shader->getHandle()));   //2
-               //shader->addUniform(new GLSLUniform("MVPMat", utMAT4, shader->getHandle()));    //3
-               //shader->addUniform(new GLSLUniform("TexUnit0", utSAMPLER2D, shader->getHandle())); //4
-
-               ////Material Properties
-               //shader->addUniform(new GLSLUniform("Material.Ka", utVEC4, shader->getHandle())); //5
-               //shader->addUniform(new GLSLUniform("Material.Kd", utVEC4, shader->getHandle())); //6
-               //shader->addUniform(new GLSLUniform("Material.Ks", utVEC4, shader->getHandle())); //7
-               //shader->addUniform(new GLSLUniform("Material.SpecularCoeff", utFLOAT, shader->getHandle())); //8
-
-               ////ShadowMap sampler
-               //shader->addUniform(new GLSLUniform("ShadowMap", utSAMPLER2DSHADOW, shader->getHandle())); //9
-
-               //grassSkin.getMultiTextureSet().at(0).setTexRepeats(5.0f);
-               grassSkin.setAmbient(aftrColor4f(0.4f, 0.4f, 0.4f, 1.0f)); //Color of object when it is not in any light
-               grassSkin.setDiffuse(aftrColor4f(1.0f, 1.0f, 1.0f, 1.0f)); //Diffuse color components (ie, matte shading color of this object)
-               grassSkin.setSpecular(aftrColor4f(0.4f, 0.4f, 0.4f, 1.0f)); //Specular color component (ie, how "shiney" it is)
-               grassSkin.setSpecularCoefficient(10); // How "sharp" are the specular highlights (bigger is sharper, 1000 is very sharp, 10 is very dull)
-
-               std::cout << "\nSKIN: " << grassSkin.toString() << std::endl;
-           });
-
-       grid2->setLabel("Grid2");
-       grid2->isVisible = true;
-       worldLst->push_back(grid2);
-   }
-
-   if (key.keysym.sym == SDLK_3) {
-       
-   }
-
-   if( key.keysym.sym == SDLK_1 )
-   {
-       WO* wo = nullptr;
-       for (int i = 0; i < this->worldLst->size(); i++) {
-           if (this->worldLst->at(i)->getLabel() == "Grid") {
-               wo = this->worldLst->at(i);
-           }
-       }
-
-       //std::vector< Vector > verts;
-       /*std::vector<float> verts;
-       std::vector< unsigned int > indices;
-       auto og_verts = wo->getModel()->getCompositeVertexList();
-       for (size_t i = 0; i < og_verts.size(); ++i) {
-           verts.push_back(float(og_verts[i][0]));
-           verts.push_back(float(og_verts[i][1]));
-           verts.push_back(float(og_verts[i][2]));
-       }*/
-
-       OpenSimplexNoise noise;
-
-       //verts[2] = 20.0;
-       //for (int i = 0; i < verts.size(); i += 3) {
-       //    if (verts[i] > 40 || verts[i] < -40 || verts[i + 1] < -40 || verts[i + 1] > 40) {
-       //        // no op
-       //    }
-       //    else {
-       //        auto z = (noise.Evaluate(verts[i] * 256, verts[i + 1] * 256) * 5) + 5;
-       //        verts[i + 2] = z;
-       //    }
-       //}
-       //float* va = verts.data();
-
-       //for (int i = 0; i < verts.size(); i++) {
-       //    if (verts[i][0] > 40 || verts[i][0] < -40 || verts[i][1] < -40 || verts[i][1] > 40) {
-       //        //std::cout << verts[i][0] << ", " << verts[i][1] << std::endl;
-       //    }
-       //    else {
-       //        auto z = (noise.Evaluate(verts[i][0] * 256, verts[i][1] * 256) * 5) + 5;
-       //        verts[i][2] = z;
-       //    }
-       //    
-       //}
-
-       //auto og_idx = wo->getModel()->getCompositeIndexList();
-       //for (size_t i = 0; i < og_idx.size(); ++i) {
-       //    indices.push_back(og_idx.at(i));
-       //}
-
-       //std::unique_ptr<ModelMeshRenderDataGenerator > r = std::make_unique<ModelMeshRenderDataGenerator>();
-       ////*r->getVerts() = std::vector<Vector>(verts);
-       //*r->getIndicies() = std::vector< unsigned int >(indices);
-       ////auto modelData = std::make_unique<ModelMeshRenderData>(r->generateFlatTriangles());
-       //auto mmds = ModelMeshDataShared(std::make_unique<ModelMeshRenderData>(r->generateFlatTriangles()), MESH_SHADING_TYPE::mstFLAT, GL_TRIANGLES);
-       //mmds.setRenderDataGenerator(std::move(r));
-       //mmds.generateRenderData(MESH_SHADING_TYPE::mstFLAT, MESH_RENDER_TYPE::mrtVBO);
-       //ModelMeshDataShared* mmds = new ModelMeshDataShared(std::move(r));
-
-       //GLfloat vertices[verts.size() * 3];
-
-       auto mmrd = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4);
-       mmrd->mapVBODataToClientMemory(GL_READ_WRITE);
-       mmrd->mapVBOIdxDataToClientMemory(GL_READ_ONLY);
-
-       auto idx_size = mmrd->getIdxSize();
-
-       std::vector<float> verts;
-       std::cout << idx_size << std::endl;
-       for (int i = 0; i < idx_size; i++) {
-           auto ptr = mmrd->getVertexPtrAtIndexInVertexList(i);
-           std::cout << ptr[0] << ", " << ptr[1] << ", " << ptr[2] << std::endl;
-           /*ptr[2] += 5;*/
-           verts.push_back(ptr[0]);
-           verts.push_back(ptr[1]);
-           verts.push_back(ptr[2]);
-       }
-
-       for (int i = 0; i < verts.size(); i+=3) {
-           //std::cout << verts[i] << ", " << verts[i+1] << ", " << verts[i+2] << std::endl;
-       }
-
-
-       mmrd->unMapVBODataFromClientMemory();
-       mmrd->unMapVBOIdxDataFromClientMemory();
-
-       //auto buffer = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstFLAT, 4)->getVBOVtx();
-
-       //float data[10];
-
-       //glBindBuffer(GL_ARRAY_BUFFER, buffer);
-
-       //glBufferSubData(GL_ARRAY_BUFFER, 0, 1800, va);
-
-       for (int i = 0; i < 1800; i++) {
-           //std::cout << va[i] << std::endl;
-       }
-       /*void* ptr = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
-       memcpy(ptr, &va[0], sizeof(va));
-       glUnmapBuffer(GL_ARRAY_BUFFER);*/
-
-       //glBufferData(GL_ARRAY_BUFFER, 1800 * sizeof(float), va, GL_DYNAMIC_DRAW);
-       //glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), &va[0], GL_STATIC_DRAW);
-       //wo->render(*this->cam);
-
-       
-
-       /*auto new_verts = wo->getModel()->getCompositeVertexList();
-       for (int i = 0; i < new_verts.size(); i++) {
-           std::cout << new_verts[i].toString() << std::endl;
-       }*/
-
-       /*ModelMeshSkin &skin = wo->getModel()->getSkin(0);
-
-       mmds.render(skin);
-
-       mmds.getRenderDataGenerator()->getVerts();
-
-       auto mesh = ModelMesh(std::move(skin), &mmds);
-
-       std::vector<ModelMesh*> meshes;
-       meshes.push_back(&mesh);
-
-       auto mds = ModelDataShared(std::move(meshes));
-
-       WO* grid = WO::New();
-       Model* model = Model::New(grid, &mds);
-       model->renderBBox = false;
-
-       grid->setModel(model);
-       grid->setPosition(Vector(0, 0, 0));
-       grid->setLabel("Grid2");*/
-       //this->worldLst->push_back(grid);
-
-       //std::cout << skin.toString() << std::endl;
-
-       //std::string vert = ManagerEnvironmentConfiguration::getLMM() + "/shaders/defaultGL32.vert";
-       //std::string frag = ManagerEnvironmentConfiguration::getLMM() + "/shaders/defaultGL32.frag";
-       ////skin.setShader(ManagerShader::loadShader(vert, frag));
-
-       //auto shared = ManagerEnvironmentConfiguration::getLMM();
-       //Tex tex = *ManagerTex::loadTexAsync(shared + "/models/grid.png");
-
-       //skin.getMultiTextureSet().at(0) = tex;
-       ////std::cout << tex.toString() << std::endl;
-
-       //std::vector< ModelMesh* > meshes;
-       //meshes.push_back(new ModelMesh(std::move(skin), mmds));
-       //meshes[0]->setParentModel(wo->getModel());
-
-       //ModelDataShared* mds = new ModelDataShared(meshes);
-
-       //Model* model = Model::New(wo, mds);
-       ///*MESH_SHADING_TYPE mst = model->getModelDataShared()->getModelMeshes().at(0)->getSkin().getMeshShadingType();
-       //MESH_RENDER_TYPE mrt = model->getModelDataShared()->getModelMeshes().at(0)->getSkin().getMeshRenderType();
-       //GLenum mpt = model->getModelDataShared()->getModelMeshes().at(0)->getSkin().getGLPrimType();
-       //model->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->generateRenderData(mst, mrt, mpt);
-
-       //model->getModelDataShared()->getModelMeshes().at(0)->setParentModel(model);*/
-
-       //WO* new_grid = WO::New();
-
-       //new_grid->setModel(model);
-       //new_grid->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
-       //new_grid->upon_async_model_loaded([new_grid]()
-       //    {
-       //        ModelMeshSkin& grassSkin = new_grid->getModel()->getModelDataShared()->getModelMeshes().at(0)->getSkins().at(0);
-       //        grassSkin.getMultiTextureSet().at(0).setTexRepeats(5.0f);
-       //        grassSkin.setAmbient(aftrColor4f(0.4f, 0.4f, 0.4f, 1.0f)); //Color of object when it is not in any light
-       //        grassSkin.setDiffuse(aftrColor4f(1.0f, 1.0f, 1.0f, 1.0f)); //Diffuse color components (ie, matte shading color of this object)
-       //        grassSkin.setSpecular(aftrColor4f(0.4f, 0.4f, 0.4f, 1.0f)); //Specular color component (ie, how "shiney" it is)
-       //        grassSkin.setSpecularCoefficient(10); // How "sharp" are the specular highlights (bigger is sharper, 1000 is very sharp, 10 is very dull)
-       //    });
-       ////std::cout << wo->getModel()->getSkin(0).getMultiTextureSet().at(0).toString() << std::endl;
-       ////wo->setPosition(Vector(50, 50, 0));
-
-       ////WO* grid2 = WO::New();
-       ////MGLPointSetShaderAccelerated* mgl = MGLPointSetShaderAccelerated::New(grid2, verts, indices, GL_POINTS);
-       ////grid2->setModel(mgl);
-
-       //new_grid->setPosition(Vector(-50, -50, 0));
-       ////grid2->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
-       ////grid2->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->generateRenderData()
-       ////grid2->upon_async_model_loaded([grid2, wo]()
-       ////    {
-       ////        ModelMeshSkin& grid2Skin = grid2->getModel()->getModelDataShared()->getModelMeshes().at(0)->getSkins().at(0);
-       ////        grid2Skin.getMultiTextureSet().at(0).setTexRepeats(5.0f);
-       ////        grid2Skin.setAmbient(aftrColor4f(0.4f, 0.4f, 0.4f, 1.0f)); //Color of object when it is not in any light
-       ////        grid2Skin.setDiffuse(aftrColor4f(1.0f, 1.0f, 1.0f, 1.0f)); //Diffuse color components (ie, matte shading color of this object)
-       ////        grid2Skin.setSpecular(aftrColor4f(0.4f, 0.4f, 0.4f, 1.0f)); //Specular color component (ie, how "shiney" it is)
-       ////        grid2Skin.setSpecularCoefficient(10); // How "sharp" are the specular highlights (bigger is sharper, 1000 is very sharp, 10 is very dull)
-       ////    });
-
-       //new_grid->setLabel("Grid2");
-       //worldLst->push_back(new_grid);
-
-       //std::vector<Vector> vertices;
-       //for (int i = 0; i < this->worldLst->size(); i++) {
-       //    if (this->worldLst->at(i)->getLabel() == "Grass") {
-       //        vertices = this->worldLst->at(i)->getModel()->getCompositeVertexList();
-       //    }
-       //}
-       //for (int i = 0; i < vertices.size(); i++) {
-       //    //auto z = (noise.Evaluate(vertices[i][0] * 256, vertices[i][1] * 256) * 100) + 5;
-       //    //vertices[i][2] = z;
-       //    std::cout << vertices[i].toString() << std::endl;
-       //}
-   }
 }
 
 
@@ -582,7 +268,7 @@ void Aftr::GLViewHeatmap::loadMap()
    std::string wheeledCar( ManagerEnvironmentConfiguration::getSMM() + "/models/rcx_treads.wrl" );
    std::string grass( ManagerEnvironmentConfiguration::getSMM() + "/models/grassFloor400x400_pp.wrl" );
    std::string human( ManagerEnvironmentConfiguration::getSMM() + "/models/human_chest.wrl" );
-   std::string grid(ManagerEnvironmentConfiguration::getLMM() + "/models/new_grid.obj");
+   std::string grid(ManagerEnvironmentConfiguration::getLMM() + "/models/new_grid_small.obj");
 
    OpenSimplexNoise noise;
 
@@ -598,9 +284,10 @@ void Aftr::GLViewHeatmap::loadMap()
 
    //SkyBox Textures readily available
    std::vector< std::string > skyBoxImageNames; //vector to store texture paths
+   skyBoxImageNames.push_back(ManagerEnvironmentConfiguration::getLMM() + "/models/Solid_black.png");
    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_water+6.jpg" );
    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_dust+6.jpg" );
-   skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_mountains+6.jpg" );
+   //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_mountains+6.jpg" );
    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_winter+6.jpg" );
    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/early_morning+6.jpg" );
    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_afternoon+6.jpg" );
