@@ -38,14 +38,12 @@
 #include "ModelMeshRenderDataGenerator.h"
 #include "GLSLShaderDefaultGL32.h"
 #include "GLSLUniform.h"
-#include "MGLPointSetShaderAccelerated.h"
-#include "WRLParser.h"
 
 using namespace Aftr;
 
-static int seed = 0.0;
-static int scale = 0;
-static bool load_heatmap, animate = false;
+static int seed = 0;
+static float scale = 0.0;
+static bool load_heatmap, animate, pulsate, auto_load = false;
 static int grid_id = -1;
 
 GLViewHeatmap* GLViewHeatmap::New( const std::vector< std::string >& args )
@@ -96,7 +94,54 @@ void set_grid_id(unsigned int id) {
     grid_id = id;
 }
 
-int generate_heatmap_step(WO* wo, int step, int max) {
+void pulsate_heatmap(WO* wo, int section, int& max, int modifier) {
+    OpenSimplexNoise noise(seed);
+
+    std::vector<float> verts;
+    auto og_verts = wo->getModel()->getCompositeVertexList();
+    auto v_offset = (og_verts.size() / 10) * section;
+    for (size_t i = v_offset; i < (og_verts.size() / 10) * (section + 1); ++i) {
+        verts.push_back(float(og_verts[i][0]));
+        verts.push_back(float(og_verts[i][1]));
+        verts.push_back(float(og_verts[i][2]));
+    }
+
+    for (int i = 0; i < verts.size(); i += 3) {
+        float z = 0;
+        auto n = noise.Evaluate(verts[i] * 256, verts[i + 1] * 256) * (scale + modifier);
+        if (n > 0) {
+            if (n > max) max = n;
+            z = n;
+        }
+        //z = 0;
+        verts[i + 2] = z;
+    }
+    float* va = verts.data();
+
+    auto loc = glGetUniformLocation(34, "max_height");
+    glProgramUniform1f(34, loc, max);
+
+    auto stride = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVtxStride();
+    auto size = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVtxSize();
+    auto offset = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVertsOffset();
+
+    auto buffer = wo->getModel()->getModelDataShared()->getModelMeshes().at(0)->getMeshDataShared()->getModelMeshRenderData(MESH_SHADING_TYPE::mstSMOOTH, 4)->getVBOVtx();
+
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+
+    float sub_va[3]{ va[0], va[1], va[2] };
+    int pos = 0;
+    for (auto i = offset * stride * section; i < offset * stride * (section + 1); i += stride) {
+        sub_va[pos % 3] = va[pos];
+        sub_va[pos % 3 + 1] = va[pos + 1];
+        sub_va[pos % 3 + 2] = va[pos + 2];
+        glBufferSubData(GL_ARRAY_BUFFER, i, sizeof(float) * 3, sub_va);
+        pos += 3;
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void generate_heatmap_step(WO* wo, int step, int& max) {
     OpenSimplexNoise noise(seed);
 
     float verts[3];
@@ -126,8 +171,6 @@ int generate_heatmap_step(WO* wo, int step, int max) {
 
     glBufferSubData(GL_ARRAY_BUFFER, (step * stride) + offset, sizeof(float) * 3, verts);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    return max;
 }
 
 void generate_heatmap(WO* wo) {
@@ -153,8 +196,6 @@ void generate_heatmap(WO* wo) {
         verts[i + 2] = z;
     }
     float* va = verts.data();
-
-    std::cout << "max = " << max << std::endl;
 
     auto loc = glGetUniformLocation(34, "max_height");
     glProgramUniform1f(34, loc, max);
@@ -191,15 +232,24 @@ void GLViewHeatmap::updateWorld()
                           //If you want to add additional functionality, do it after
                           //this call.
 
+   if (auto_load) {
+       generate_heatmap(this->worldLst->getWOByID(grid_id));
+       load_heatmap = false;
+       animate = false;
+       pulsate = false;
+   }
+
    if (load_heatmap) {
        generate_heatmap(this->worldLst->getWOByID(grid_id));
        load_heatmap = false;
        animate = false;
+       pulsate = false;
    }
 
    if (animate) {
-       max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
+       generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
        step++;
+       pulsate = false;
        /*if (counter == 0) {
            max = generate_heatmap_step(this->worldLst->getWOByID(grid_id), step, max);
            step++;
@@ -209,6 +259,14 @@ void GLViewHeatmap::updateWorld()
            counter--;
        }*/
    }
+
+   /*if (pulsate) {
+       animate = false;
+       int section = rand() % 10;
+       int modifier = rand() % 2;
+       modifier < 0 ? modifier = -1 : modifier = 1;
+       pulsate_heatmap(this->worldLst->getWOByID(grid_id), section, max, modifier);
+   }*/
 }
 
 
@@ -512,7 +570,7 @@ void Aftr::GLViewHeatmap::loadMap()
            ImGui::Begin("Heatmap Gui");
 
            ImGui::SliderInt("Seed", &seed, 0, 100);
-           ImGui::SliderInt("Scale", &scale, 0, 100);
+           ImGui::SliderFloat("Scale", &scale, 0, 100);
 
            ImGui::Separator();
 
@@ -523,6 +581,12 @@ void Aftr::GLViewHeatmap::loadMap()
            if (ImGui::Button("Animate")) {
                animate = true;
            }
+           ImGui::SameLine();
+           ImGui::Checkbox("Auto Load Heatmap", &auto_load);
+           /*ImGui::SameLine();
+           if (ImGui::Button("Pulsate")) {
+               pulsate = true;
+           }*/
 
            ImGui::End();
       } );
